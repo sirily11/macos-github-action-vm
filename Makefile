@@ -26,7 +26,6 @@ build: deps
 	@echo "    Date:    $(BUILD_DATE)"
 	go build -ldflags "$(LDFLAGS)" -o "$(BINARY_NAME)" .
 	@echo "==> Built: $(BINARY_NAME)"
-	./$(BINARY_NAME) version
 
 build-all: deps
 	@echo "==> Building for all platforms..."

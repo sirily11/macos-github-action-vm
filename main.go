@@ -1,13 +1,7 @@
 package main
 
-import (
-	"os"
-
-	"github.com/rxtech-lab/rvmm/cmd"
-)
+import "github.com/rxtech-lab/rvmm/internal/tui"
 
 func main() {
-	if err := cmd.Execute(); err != nil {
-		os.Exit(1)
-	}
+	tui.Run()
 }

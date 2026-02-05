@@ -2,6 +2,7 @@ package setup
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,20 +13,31 @@ import (
 )
 
 // RequiredPackages lists the Homebrew packages needed for Ekiden
-var RequiredPackages = []string{"tart", "sshpass", "wget"}
+var RequiredPackages = []string{"tart", "sshpass", "wget", "hashicorp/tap/packer"}
+
+// RequiredTools lists the binaries needed at runtime
+var RequiredTools = []string{"tart", "sshpass", "wget", "packer"}
 
 // Run performs the initial host machine setup
 func Run(log *zap.Logger) error {
+	return RunWithIO(log, os.Stdout, os.Stderr, os.Stdin)
+}
+
+// RunWithIO performs setup using the provided IO streams.
+func RunWithIO(log *zap.Logger, stdout, stderr io.Writer, stdin io.Reader) error {
 	log.Info("Starting host setup")
 
 	// Check/install Homebrew
-	if err := ensureHomebrew(log); err != nil {
+	if err := ensureHomebrew(log, stdout, stderr, stdin); err != nil {
 		return fmt.Errorf("homebrew setup failed: %w", err)
 	}
 
 	// Install required packages
+	if err := ensureTap(log, "hashicorp/tap", stdout, stderr); err != nil {
+		return fmt.Errorf("failed to tap hashicorp: %w", err)
+	}
 	for _, pkg := range RequiredPackages {
-		if err := ensurePackage(log, pkg); err != nil {
+		if err := ensurePackage(log, pkg, stdout, stderr); err != nil {
 			return fmt.Errorf("failed to install %s: %w", pkg, err)
 		}
 	}
@@ -40,8 +52,7 @@ func Run(log *zap.Logger) error {
 	}
 
 	log.Info("Host setup completed successfully")
-	fmt.Println("\nSetup complete! You can now run:")
-	fmt.Println("  ekiden run --config rvmm.yaml")
+	fmt.Fprintln(stdout, "\nSetup complete! You can now use the TUI to run the runner.")
 
 	return nil
 }
@@ -68,7 +79,7 @@ func createSampleConfig(log *zap.Logger) error {
 	return nil
 }
 
-func ensureHomebrew(log *zap.Logger) error {
+func ensureHomebrew(log *zap.Logger, stdout, stderr io.Writer, stdin io.Reader) error {
 	// Check if Homebrew is installed
 	if _, err := exec.LookPath("brew"); err == nil {
 		log.Info("Homebrew is already installed")
@@ -80,9 +91,9 @@ func ensureHomebrew(log *zap.Logger) error {
 	// Install Homebrew
 	cmd := exec.Command("/bin/bash", "-c",
 		`/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	cmd.Stdin = stdin
 
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("homebrew installation failed: %w", err)
@@ -97,7 +108,7 @@ func ensureHomebrew(log *zap.Logger) error {
 	return nil
 }
 
-func ensurePackage(log *zap.Logger, pkg string) error {
+func ensurePackage(log *zap.Logger, pkg string, stdout, stderr io.Writer) error {
 	// Check if package is installed
 	cmd := exec.Command("brew", "list", pkg)
 	if err := cmd.Run(); err == nil {
@@ -109,8 +120,8 @@ func ensurePackage(log *zap.Logger, pkg string) error {
 
 	// Install package
 	cmd = exec.Command("brew", "install", pkg)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
 
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("brew install %s failed: %w", pkg, err)
@@ -154,18 +165,42 @@ func validateSystem(log *zap.Logger) error {
 	return nil
 }
 
+func ensureTap(log *zap.Logger, tap string, stdout, stderr io.Writer) error {
+	cmd := exec.Command("brew", "tap")
+	output, err := cmd.Output()
+	if err == nil {
+		lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+		for _, line := range lines {
+			if strings.TrimSpace(line) == tap {
+				log.Info("Homebrew tap already present", zap.String("tap", tap))
+				return nil
+			}
+		}
+	}
+
+	log.Info("Adding Homebrew tap", zap.String("tap", tap))
+	cmd = exec.Command("brew", "tap", tap)
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("brew tap %s failed: %w", tap, err)
+	}
+
+	return nil
+}
+
 // CheckDependencies verifies all required tools are available
 func CheckDependencies() error {
 	var missing []string
 
-	for _, pkg := range RequiredPackages {
+	for _, pkg := range RequiredTools {
 		if _, err := exec.LookPath(pkg); err != nil {
 			missing = append(missing, pkg)
 		}
 	}
 
 	if len(missing) > 0 {
-		return fmt.Errorf("missing required tools: %s. Run 'ekiden setup' first", strings.Join(missing, ", "))
+		return fmt.Errorf("missing required tools: %s. Run setup from the TUI first", strings.Join(missing, ", "))
 	}
 
 	return nil

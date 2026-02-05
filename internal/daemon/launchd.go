@@ -3,6 +3,7 @@ package daemon
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -23,7 +24,7 @@ type PlistData struct {
 }
 
 // Install creates and loads the LaunchDaemon
-func Install(log *zap.Logger, cfg *config.Config, configPath string) error {
+func Install(log *zap.Logger, cfg *config.Config, configPath string, out io.Writer) error {
 	log.Info("Installing LaunchDaemon", zap.String("label", cfg.Daemon.Label))
 
 	// Get absolute paths
@@ -82,17 +83,15 @@ func Install(log *zap.Logger, cfg *config.Config, configPath string) error {
 		zap.String("plist", plistPath),
 	)
 
-	fmt.Printf("LaunchDaemon installed: %s\n", cfg.Daemon.Label)
-	fmt.Printf("Plist location: %s\n", plistPath)
-	fmt.Println("\nThe runner will start automatically on boot.")
-	fmt.Println("To check status: ekiden daemon status")
-	fmt.Println("To uninstall: sudo ekiden daemon uninstall")
+	fmt.Fprintf(out, "LaunchDaemon installed: %s\n", cfg.Daemon.Label)
+	fmt.Fprintf(out, "Plist location: %s\n", plistPath)
+	fmt.Fprintln(out, "\nThe runner will start automatically on boot.")
 
 	return nil
 }
 
 // Uninstall unloads and removes the LaunchDaemon
-func Uninstall(log *zap.Logger, cfg *config.Config) error {
+func Uninstall(log *zap.Logger, cfg *config.Config, out io.Writer) error {
 	log.Info("Uninstalling LaunchDaemon", zap.String("label", cfg.Daemon.Label))
 
 	plistPath := cfg.Daemon.PlistPath
@@ -100,7 +99,7 @@ func Uninstall(log *zap.Logger, cfg *config.Config) error {
 	// Check if plist exists
 	if _, err := os.Stat(plistPath); os.IsNotExist(err) {
 		log.Warn("Plist file not found", zap.String("path", plistPath))
-		fmt.Println("LaunchDaemon is not installed")
+		fmt.Fprintln(out, "LaunchDaemon is not installed")
 		return nil
 	}
 
@@ -120,32 +119,32 @@ func Uninstall(log *zap.Logger, cfg *config.Config) error {
 	}
 
 	log.Info("LaunchDaemon uninstalled", zap.String("label", cfg.Daemon.Label))
-	fmt.Printf("LaunchDaemon %s uninstalled\n", cfg.Daemon.Label)
+	fmt.Fprintf(out, "LaunchDaemon %s uninstalled\n", cfg.Daemon.Label)
 
 	return nil
 }
 
 // Status shows the current daemon status
-func Status(log *zap.Logger, cfg *config.Config) error {
+func Status(log *zap.Logger, cfg *config.Config, out io.Writer) error {
 	plistPath := cfg.Daemon.PlistPath
 
 	// Check if plist exists
 	if _, err := os.Stat(plistPath); os.IsNotExist(err) {
-		fmt.Printf("LaunchDaemon %s is not installed\n", cfg.Daemon.Label)
+		fmt.Fprintf(out, "LaunchDaemon %s is not installed\n", cfg.Daemon.Label)
 		return nil
 	}
 
-	fmt.Printf("LaunchDaemon: %s\n", cfg.Daemon.Label)
-	fmt.Printf("Plist path: %s\n", plistPath)
+	fmt.Fprintf(out, "LaunchDaemon: %s\n", cfg.Daemon.Label)
+	fmt.Fprintf(out, "Plist path: %s\n", plistPath)
 
 	// Check if loaded
 	cmd := exec.Command("launchctl", "list", cfg.Daemon.Label)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		fmt.Println("Status: Not loaded")
+		fmt.Fprintln(out, "Status: Not loaded")
 	} else {
-		fmt.Println("Status: Loaded")
-		fmt.Printf("\n%s", string(output))
+		fmt.Fprintln(out, "Status: Loaded")
+		fmt.Fprintf(out, "\n%s", string(output))
 	}
 
 	// Check stdout/stderr files
@@ -153,10 +152,10 @@ func Status(log *zap.Logger, cfg *config.Config) error {
 	stderrPath := filepath.Join(cfg.Options.WorkingDirectory, "stderr")
 
 	if info, err := os.Stat(stdoutPath); err == nil {
-		fmt.Printf("\nStdout log: %s (%d bytes)\n", stdoutPath, info.Size())
+		fmt.Fprintf(out, "\nStdout log: %s (%d bytes)\n", stdoutPath, info.Size())
 	}
 	if info, err := os.Stat(stderrPath); err == nil {
-		fmt.Printf("Stderr log: %s (%d bytes)\n", stderrPath, info.Size())
+		fmt.Fprintf(out, "Stderr log: %s (%d bytes)\n", stderrPath, info.Size())
 	}
 
 	return nil
