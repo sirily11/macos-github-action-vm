@@ -1,0 +1,53 @@
+# Ekiden CLI Configuration
+# Copy this file to ekiden.yaml and fill in your values
+
+github:
+  # GitHub Personal Access Token with repo/admin:org permissions
+  api_token: "ghp_xxxxxxxxxxxxxxxxxxxx"
+  # Registration endpoint for runners
+  # For organization: https://api.github.com/orgs/ORG_NAME/actions/runners/registration-token
+  # For repository: https://api.github.com/repos/OWNER/REPO/actions/runners/registration-token
+  registration_endpoint: "https://api.github.com/orgs/YOUR_ORG/actions/runners/registration-token"
+  # URL for runner registration
+  # For organization: https://github.com/ORG_NAME
+  # For repository: https://github.com/OWNER/REPO
+  runner_url: "https://github.com/YOUR_ORG"
+  # Runner name (appears in GitHub Actions)
+  runner_name: "runner"
+  # Labels for the runner
+  runner_labels:
+    - self-hosted
+    - arm64
+    - macOS
+
+vm:
+  # SSH credentials for the VM
+  username: "admin"
+  password: "admin"
+
+registry:
+  # OCI registry URL (leave empty for local images)
+  url: ""
+  # Image name with tag
+  image_name: "runner:latest"
+  # Registry credentials (if required)
+  username: ""
+  password: ""
+
+options:
+  # Resize disk to this size (e.g., "200g"). Leave empty to skip.
+  truncate_size: ""
+  # Log file path
+  log_file: "runner.log"
+  # File to check for shutdown signal
+  shutdown_flag_file: ".shutdown"
+  # Working directory for VM operations
+  working_directory: "/Users/admin/vm"
+
+daemon:
+  # LaunchDaemon label
+  label: "com.mirego.ekiden"
+  # Path to install the plist
+  plist_path: "/Library/LaunchDaemons/com.mirego.ekiden.plist"
+  # User to run the daemon as
+  user: "admin"
