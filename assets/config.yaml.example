@@ -1,5 +1,5 @@
 # Ekiden CLI Configuration
-# Copy this file to ekiden.yaml and fill in your values
+# Copy this file to rvmm.yaml and fill in your values
 
 github:
   # GitHub Personal Access Token with repo/admin:org permissions

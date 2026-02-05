@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
+	"github.com/rxtech-lab/rvmm/assets"
 	"go.uber.org/zap"
 )
 
@@ -33,10 +35,36 @@ func Run(log *zap.Logger) error {
 		log.Warn("System validation warnings", zap.Error(err))
 	}
 
+	if err := createSampleConfig(log); err != nil {
+		return fmt.Errorf("create sample config failed: %w", err)
+	}
+
 	log.Info("Host setup completed successfully")
 	fmt.Println("\nSetup complete! You can now run:")
-	fmt.Println("  ekiden run --config ekiden.yaml")
+	fmt.Println("  ekiden run --config rvmm.yaml")
 
+	return nil
+}
+
+func createSampleConfig(log *zap.Logger) error {
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working directory: %w", err)
+	}
+
+	configPath := filepath.Join(workingDir, "rvmm.yaml")
+	if _, err := os.Stat(configPath); err == nil {
+		log.Info("Sample config already exists", zap.String("path", configPath))
+		return nil
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("check existing config: %w", err)
+	}
+
+	if err := os.WriteFile(configPath, assets.ConfigExample, 0o644); err != nil {
+		return fmt.Errorf("write config: %w", err)
+	}
+
+	log.Info("Sample config created", zap.String("path", configPath))
 	return nil
 }
 

@@ -64,11 +64,11 @@ func Load(configPath string) (*Config, error) {
 	if configPath != "" {
 		v.SetConfigFile(configPath)
 	} else {
-		v.SetConfigName("ekiden")
+		v.SetConfigName("rvmm")
 		v.SetConfigType("yaml")
 		v.AddConfigPath(".")
-		v.AddConfigPath("$HOME/.ekiden")
-		v.AddConfigPath("/etc/ekiden")
+		v.AddConfigPath("$HOME/.rvmm")
+		v.AddConfigPath("/etc/rvmm")
 	}
 
 	// Read config

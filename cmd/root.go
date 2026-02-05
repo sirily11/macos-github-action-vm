@@ -46,7 +46,7 @@ func Execute() error {
 
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output")
-	rootCmd.PersistentFlags().StringVarP(&configFile, "config", "c", "", "Config file (default: ekiden.yaml)")
+	rootCmd.PersistentFlags().StringVarP(&configFile, "config", "c", "", "Config file (default: rvmm.yaml)")
 }
 
 func initLogger() error {

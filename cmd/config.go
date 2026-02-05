@@ -27,7 +27,7 @@ Copy and edit this file for your deployment.`,
 
 func init() {
 	rootCmd.AddCommand(configCmd)
-	configCmd.Flags().StringVarP(&outputFile, "output", "o", "ekiden.yaml", "Output file path")
+	configCmd.Flags().StringVarP(&outputFile, "output", "o", "rvmm.yaml", "Output file path")
 }
 
 func runConfig() error {
