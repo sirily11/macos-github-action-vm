@@ -27,10 +27,13 @@ vm:
 
 registry:
   # OCI registry URL (leave empty for local images)
+  # For GHCR, use: ghcr.io
   url: ""
   # Image name with tag
+  # For GHCR, use: ghcr.io/OWNER/IMAGE:TAG
   image_name: "runner:latest"
   # Registry credentials (if required)
+  # For GHCR, use a token with packages:read (and packages:write to push)
   username: ""
   password: ""
 

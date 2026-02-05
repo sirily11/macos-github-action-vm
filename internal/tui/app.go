@@ -35,6 +35,8 @@ const (
 	stateMenu appState = iota
 	stateConfig
 	stateBuildPrompt
+	statePushPrompt
+	statePullPrompt
 	stateLogs
 )
 
@@ -43,6 +45,9 @@ const (
 	actionBuild
 	actionConfig
 	actionRun
+	actionListImages
+	actionPushImage
+	actionPullImage
 	actionDaemonInstall
 	actionDaemonUninstall
 	actionDaemonStatus
@@ -82,6 +87,8 @@ type model struct {
 	menu         list.Model
 	configForm   configForm
 	buildInput   textinput.Model
+	pushInput    textinput.Model
+	pullInput    textinput.Model
 	spinner      spinner.Model
 	logger       *zap.Logger
 	logWriter    io.Writer
@@ -126,6 +133,9 @@ func newModel() model {
 		menuItem{title: "Build VM image", description: "Run Packer/Tart build for base and runner", action: actionBuild},
 		menuItem{title: "Create/edit config", description: "Edit rvmm.yaml in project root", action: actionConfig},
 		menuItem{title: "Run runner", description: "Start the runner loop", action: actionRun},
+		menuItem{title: "List images", description: "Show Tart images and sizes", action: actionListImages},
+		menuItem{title: "Push image", description: "Push local image to GHCR", action: actionPushImage},
+		menuItem{title: "Pull image", description: "Pull image from registry", action: actionPullImage},
 		menuItem{title: "Install daemon", description: "Install launchd daemon", action: actionDaemonInstall},
 		menuItem{title: "Uninstall daemon", description: "Remove launchd daemon", action: actionDaemonUninstall},
 		menuItem{title: "Daemon status", description: "Show launchd status", action: actionDaemonStatus},
@@ -145,6 +155,16 @@ func newModel() model {
 	buildInput.CharLimit = 512
 	buildInput.Width = 50
 
+	pushInput := textinput.New()
+	pushInput.Placeholder = "ghcr.io/owner/image:tag"
+	pushInput.CharLimit = 512
+	pushInput.Width = 50
+
+	pullInput := textinput.New()
+	pullInput.Placeholder = "ghcr.io/owner/image:tag"
+	pullInput.CharLimit = 512
+	pullInput.Width = 50
+
 	spin := spinner.New()
 	spin.Spinner = spinner.Line
 
@@ -156,6 +176,8 @@ func newModel() model {
 		state:      stateMenu,
 		menu:       menu,
 		buildInput: buildInput,
+		pushInput:  pushInput,
+		pullInput:  pullInput,
 		spinner:    spin,
 		logger:     logger,
 		logWriter:  logWriter,
@@ -184,6 +206,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateConfig(msg)
 		case stateBuildPrompt:
 			return m.updateBuildPrompt(msg)
+		case statePushPrompt:
+			return m.updatePushPrompt(msg)
+		case statePullPrompt:
+			return m.updatePullPrompt(msg)
 		case stateLogs:
 			return m.updateLogScreen(msg)
 		}
@@ -220,11 +246,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch m.state {
 	case stateMenu:
+		if m.busy {
+			return m, nil
+		}
 		m.menu, cmd = m.menu.Update(msg)
 	case stateConfig:
 		m.configForm, cmd = m.configForm.Update(msg)
 	case stateBuildPrompt:
 		m.buildInput, cmd = m.buildInput.Update(msg)
+	case statePushPrompt:
+		m.pushInput, cmd = m.pushInput.Update(msg)
+	case statePullPrompt:
+		m.pullInput, cmd = m.pullInput.Update(msg)
 	case stateLogs:
 		return m, nil
 	}
@@ -238,6 +271,10 @@ func (m model) View() string {
 		return m.viewConfig()
 	case stateBuildPrompt:
 		return m.viewBuildPrompt()
+	case statePushPrompt:
+		return m.viewPushPrompt()
+	case statePullPrompt:
+		return m.viewPullPrompt()
 	case stateLogs:
 		return m.viewLogScreen()
 	default:
@@ -290,6 +327,20 @@ func (m model) updateMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.runnerActive = true
 			m.runnerCancel = cancel
 			return m, tea.Batch(m.runRunnerCmd(ctx), m.spinner.Tick)
+		case actionListImages:
+			m.busy = true
+			m.busyLabel = "List images"
+			return m, tea.Batch(m.runListImagesCmd(), m.spinner.Tick)
+		case actionPushImage:
+			m.state = statePushPrompt
+			m.pushInput.SetValue("")
+			m.pushInput.Focus()
+			return m, nil
+		case actionPullImage:
+			m.state = statePullPrompt
+			m.pullInput.SetValue("")
+			m.pullInput.Focus()
+			return m, nil
 		case actionDaemonInstall:
 			m.busy = true
 			m.busyLabel = "Install daemon"
@@ -366,6 +417,50 @@ func (m model) updateBuildPrompt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+func (m model) updatePushPrompt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.state = stateMenu
+		return m, nil
+	case "enter":
+		image := strings.TrimSpace(m.pushInput.Value())
+		if image == "" {
+			m.lastError = "image name is required"
+			return m, nil
+		}
+		m.state = stateMenu
+		m.busy = true
+		m.busyLabel = "Push image"
+		return m, tea.Batch(m.runPushImageCmd(image), m.spinner.Tick)
+	}
+
+	var cmd tea.Cmd
+	m.pushInput, cmd = m.pushInput.Update(msg)
+	return m, cmd
+}
+
+func (m model) updatePullPrompt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.state = stateMenu
+		return m, nil
+	case "enter":
+		image := strings.TrimSpace(m.pullInput.Value())
+		if image == "" {
+			m.lastError = "image name is required"
+			return m, nil
+		}
+		m.state = stateMenu
+		m.busy = true
+		m.busyLabel = "Pull image"
+		return m, tea.Batch(m.runPullImageCmd(image), m.spinner.Tick)
+	}
+
+	var cmd tea.Cmd
+	m.pullInput, cmd = m.pullInput.Update(msg)
+	return m, cmd
+}
+
 func (m model) updateLogScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "q":
@@ -434,6 +529,14 @@ func (m model) viewBuildPrompt() string {
 	return "Build VM image\n\nOptional IPSW path or URL (leave empty for default):\n" + m.buildInput.View() + "\n\nEnter to start, Esc to cancel"
 }
 
+func (m model) viewPushPrompt() string {
+	return "Push image to GHCR\n\nTarget image name (ghcr.io/owner/image:tag):\n" + m.pushInput.View() + "\n\nEnter to push, Esc to cancel"
+}
+
+func (m model) viewPullPrompt() string {
+	return "Pull image from registry\n\nImage name (ghcr.io/owner/image:tag):\n" + m.pullInput.View() + "\n\nEnter to pull, Esc to cancel"
+}
+
 func (m model) viewLogScreen() string {
 	if m.logPath == "" {
 		return "Logs are disabled."
@@ -488,7 +591,7 @@ func (m model) runSetupCmd() tea.Cmd {
 
 func (m model) runBuildCmd(ipsw string) tea.Cmd {
 	return func() tea.Msg {
-		guestDir := filepath.Join("ekiden", "guest")
+		guestDir := "guest"
 		if err := runCommandSeries(m.logWriter, guestDir, buildCommands(ipsw)...); err != nil {
 			return taskDoneMsg{action: actionBuild, err: err}
 		}
@@ -507,6 +610,47 @@ func (m model) runRunnerCmd(ctx context.Context) tea.Cmd {
 		}
 		err = runner.Run(ctx, m.logger, cfg)
 		return taskDoneMsg{action: actionRun, err: err}
+	}
+}
+
+func (m model) runPushImageCmd(target string) tea.Cmd {
+	return func() tea.Msg {
+		if err := runCommandStreaming(m.logWriter, exec.Command("tart", "push", "runner", target)); err != nil {
+			return taskDoneMsg{action: actionPushImage, err: err}
+		}
+		return taskDoneMsg{action: actionPushImage, err: nil}
+	}
+}
+
+func (m model) runPullImageCmd(target string) tea.Cmd {
+	return func() tea.Msg {
+		if err := runCommandStreaming(m.logWriter, exec.Command("tart", "pull", target)); err != nil {
+			return taskDoneMsg{action: actionPullImage, err: err}
+		}
+		return taskDoneMsg{action: actionPullImage, err: nil}
+	}
+}
+
+func (m model) runListImagesCmd() tea.Cmd {
+	return func() tea.Msg {
+		if err := runCommandStreaming(m.logWriter, exec.Command("tart", "list")); err != nil {
+			return taskDoneMsg{action: actionListImages, err: err}
+		}
+
+		paths, err := listTartVMPaths()
+		if err != nil {
+			return taskDoneMsg{action: actionListImages, err: err}
+		}
+		if len(paths) == 0 {
+			_, _ = fmt.Fprintln(m.logWriter, "No local Tart images found.")
+			return taskDoneMsg{action: actionListImages, err: nil}
+		}
+
+		args := append([]string{"-sh"}, paths...)
+		if err := runCommandStreaming(m.logWriter, exec.Command("du", args...)); err != nil {
+			return taskDoneMsg{action: actionListImages, err: err}
+		}
+		return taskDoneMsg{action: actionListImages, err: nil}
 	}
 }
 
@@ -596,6 +740,19 @@ func readLastLogLine(path string) string {
 	}
 
 	return ""
+}
+
+func listTartVMPaths() ([]string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	glob := filepath.Join(homeDir, ".tart", "vms", "*")
+	paths, err := filepath.Glob(glob)
+	if err != nil {
+		return nil, err
+	}
+	return paths, nil
 }
 
 func sanitizeLogLine(line string) string {
