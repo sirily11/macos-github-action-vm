@@ -22,6 +22,7 @@ type GitHubConfig struct {
 	RunnerURL            string   `mapstructure:"runner_url" yaml:"runner_url"`
 	RunnerName           string   `mapstructure:"runner_name" yaml:"runner_name"`
 	RunnerLabels         []string `mapstructure:"runner_labels" yaml:"runner_labels"`
+	RunnerGroup          string   `mapstructure:"runner_group" yaml:"runner_group"`
 }
 
 // VMConfig contains VM credentials
@@ -40,10 +41,11 @@ type RegistryConfig struct {
 
 // OptionsConfig contains runtime options
 type OptionsConfig struct {
-	TruncateSize     string `mapstructure:"truncate_size" yaml:"truncate_size"`
-	LogFile          string `mapstructure:"log_file" yaml:"log_file"`
-	ShutdownFlagFile string `mapstructure:"shutdown_flag_file" yaml:"shutdown_flag_file"`
-	WorkingDirectory string `mapstructure:"working_directory" yaml:"working_directory"`
+	TruncateSize         string `mapstructure:"truncate_size" yaml:"truncate_size"`
+	LogFile              string `mapstructure:"log_file" yaml:"log_file"`
+	ShutdownFlagFile     string `mapstructure:"shutdown_flag_file" yaml:"shutdown_flag_file"`
+	WorkingDirectory     string `mapstructure:"working_directory" yaml:"working_directory"`
+	MaxConcurrentRunners int    `mapstructure:"max_concurrent_runners" yaml:"max_concurrent_runners"`
 }
 
 // DaemonConfig contains LaunchDaemon settings
@@ -100,6 +102,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("options.log_file", "runner.log")
 	v.SetDefault("options.shutdown_flag_file", ".shutdown")
 	v.SetDefault("options.working_directory", "/Users/admin/vm")
+	v.SetDefault("options.max_concurrent_runners", 1)
 
 	// Daemon defaults
 	v.SetDefault("daemon.label", "com.mirego.ekiden")

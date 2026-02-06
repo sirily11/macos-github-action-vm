@@ -36,6 +36,11 @@ func (c *Config) Validate() error {
 		errs = append(errs, "vm.password is required")
 	}
 
+	// Options validation
+	if c.Options.MaxConcurrentRunners < 1 {
+		errs = append(errs, "options.max_concurrent_runners must be at least 1")
+	}
+
 	if len(errs) > 0 {
 		return errors.New(strings.Join(errs, "; "))
 	}

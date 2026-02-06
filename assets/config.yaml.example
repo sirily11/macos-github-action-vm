@@ -19,6 +19,9 @@ github:
     - self-hosted
     - arm64
     - macOS
+  # Runner group (optional, for Enterprise/Organization runners)
+  # Leave empty for default group. Requires GitHub Enterprise or Organization.
+  runner_group: ""
 
 vm:
   # SSH credentials for the VM
@@ -42,6 +45,11 @@ options:
   truncate_size: ""
   # Log file path
   log_file: "runner.log"
+  # Maximum number of concurrent runners (VMs)
+  # Each runner requires approximately 7GB RAM and 7 CPU cores
+  # Recommended values: 1 (default), 2-4 for powerful machines
+  # Set to 1 for backward compatibility
+  max_concurrent_runners: 1
   # File to check for shutdown signal
   shutdown_flag_file: ".shutdown"
   # Working directory for VM operations

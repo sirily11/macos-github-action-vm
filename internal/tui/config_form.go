@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -30,6 +31,7 @@ func newConfigForm(cfg *config.Config) configForm {
 		{key: "github.runner_url", label: "Runner URL", required: true},
 		{key: "github.runner_name", label: "Runner name"},
 		{key: "github.runner_labels", label: "Runner labels (comma)"},
+		{key: "github.runner_group", label: "Runner group (optional)"},
 		{key: "vm.username", label: "VM username", required: true},
 		{key: "vm.password", label: "VM password", required: true, secret: true},
 		{key: "registry.url", label: "Registry URL"},
@@ -37,6 +39,7 @@ func newConfigForm(cfg *config.Config) configForm {
 		{key: "registry.username", label: "Registry username"},
 		{key: "registry.password", label: "Registry password", secret: true},
 		{key: "options.log_file", label: "Log file"},
+		{key: "options.max_concurrent_runners", label: "Max concurrent runners"},
 		{key: "options.shutdown_flag_file", label: "Shutdown flag file"},
 		{key: "options.working_directory", label: "Working directory"},
 		{key: "daemon.label", label: "Daemon label"},
@@ -122,6 +125,8 @@ func getFieldValue(cfg *config.Config, key string) string {
 		return cfg.GitHub.RunnerName
 	case "github.runner_labels":
 		return strings.Join(cfg.GitHub.RunnerLabels, ",")
+	case "github.runner_group":
+		return cfg.GitHub.RunnerGroup
 	case "vm.username":
 		return cfg.VM.Username
 	case "vm.password":
@@ -136,6 +141,8 @@ func getFieldValue(cfg *config.Config, key string) string {
 		return cfg.Registry.Password
 	case "options.log_file":
 		return cfg.Options.LogFile
+	case "options.max_concurrent_runners":
+		return strconv.Itoa(cfg.Options.MaxConcurrentRunners)
 	case "options.shutdown_flag_file":
 		return cfg.Options.ShutdownFlagFile
 	case "options.working_directory":
@@ -167,6 +174,8 @@ func setFieldValue(cfg *config.Config, key, value string) {
 		if value != "" {
 			cfg.GitHub.RunnerLabels = splitCSV(value)
 		}
+	case "github.runner_group":
+		cfg.GitHub.RunnerGroup = value
 	case "vm.username":
 		cfg.VM.Username = value
 	case "vm.password":
@@ -182,6 +191,12 @@ func setFieldValue(cfg *config.Config, key, value string) {
 	case "options.log_file":
 		if value != "" {
 			cfg.Options.LogFile = value
+		}
+	case "options.max_concurrent_runners":
+		if value != "" {
+			if n, err := strconv.Atoi(value); err == nil && n >= 1 {
+				cfg.Options.MaxConcurrentRunners = n
+			}
 		}
 	case "options.shutdown_flag_file":
 		if value != "" {

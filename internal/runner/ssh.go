@@ -126,6 +126,7 @@ func (s *SSHClient) ConfigureRunner(ctx context.Context, ip string, token string
 		labelsStr += l
 	}
 
+	// Build config command
 	configCmd := fmt.Sprintf(
 		"./actions-runner/config.sh --url %s --token %s --ephemeral --name %s --labels %s --unattended --replace",
 		s.cfg.GitHub.RunnerURL,
@@ -134,7 +135,21 @@ func (s *SSHClient) ConfigureRunner(ctx context.Context, ip string, token string
 		labelsStr,
 	)
 
-	return s.Execute(ctx, ip, configCmd, false)
+	// Add runner group if specified
+	if s.cfg.GitHub.RunnerGroup != "" {
+		configCmd += fmt.Sprintf(" --runnergroup \"%s\"", s.cfg.GitHub.RunnerGroup)
+	}
+
+	output, err := s.ExecuteWithOutput(ctx, ip, configCmd)
+	if err != nil {
+		s.log.Error("Runner configuration failed",
+			zap.String("output", output),
+			zap.Error(err))
+		return fmt.Errorf("failed to configure runner: %w (output: %s)", err, output)
+	}
+
+	s.log.Debug("Runner configuration output", zap.String("output", output))
+	return nil
 }
 
 // RunRunner starts the GitHub Actions runner and waits for completion
