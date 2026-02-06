@@ -20,6 +20,8 @@ var ipRegex = regexp.MustCompile(`^(\d+\.){3}\d+$`)
 type VMManager struct {
 	cfg *config.Config
 	log *zap.Logger
+	// Resolved image ref to use for clone/run (local or registry)
+	imageRef string
 }
 
 // NewVMManager creates a new VM manager
@@ -32,10 +34,17 @@ func NewVMManager(cfg *config.Config, log *zap.Logger) *VMManager {
 
 // GetRegistryPath returns the full image path for tart commands
 func (v *VMManager) GetRegistryPath() string {
-	if v.cfg.Registry.URL != "" {
-		return fmt.Sprintf("%s/%s", v.cfg.Registry.URL, v.cfg.Registry.ImageName)
+	if v.cfg.Registry.URL == "" {
+		return v.cfg.Registry.ImageName
 	}
-	return v.cfg.Registry.ImageName
+
+	// Avoid double-prefixing when image name already includes the registry host
+	registryPrefix := v.cfg.Registry.URL + "/"
+	if strings.HasPrefix(v.cfg.Registry.ImageName, registryPrefix) {
+		return v.cfg.Registry.ImageName
+	}
+
+	return fmt.Sprintf("%s/%s", v.cfg.Registry.URL, v.cfg.Registry.ImageName)
 }
 
 // GetCachePath returns the local cache path for the image
@@ -70,7 +79,12 @@ func (v *VMManager) Login(ctx context.Context) error {
 
 // ImageExists checks if the image is already cached locally
 func (v *VMManager) ImageExists(ctx context.Context) (bool, error) {
+	localRef := v.cfg.Registry.ImageName
 	registryPath := v.GetRegistryPath()
+	localName := localRef
+	if idx := strings.Index(localRef, ":"); idx > 0 {
+		localName = localRef[:idx]
+	}
 
 	cmd := exec.CommandContext(ctx, "tart", "list")
 	output, err := cmd.Output()
@@ -78,7 +92,23 @@ func (v *VMManager) ImageExists(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("tart list failed: %w", err)
 	}
 
-	return strings.Contains(string(output), registryPath), nil
+	listOutput := string(output)
+	if strings.Contains(listOutput, localRef) {
+		v.imageRef = localRef
+		return true, nil
+	}
+	if localName != localRef && strings.Contains(listOutput, localName) {
+		v.imageRef = localName
+		return true, nil
+	}
+	if registryPath != localRef && strings.Contains(listOutput, registryPath) {
+		v.imageRef = registryPath
+		return true, nil
+	}
+
+	// Default to registry path for pulls/clones when not found locally
+	v.imageRef = registryPath
+	return false, nil
 }
 
 // PullImage pulls the image from the registry
@@ -188,9 +218,12 @@ func (v *VMManager) resizeCachedImage(ctx context.Context) error {
 func (v *VMManager) Clone(ctx context.Context, instanceName string) error {
 	v.log.Info("Cloning VM", zap.String("instance", instanceName))
 
-	registryPath := v.GetRegistryPath()
+	imageRef := v.imageRef
+	if imageRef == "" {
+		imageRef = v.GetRegistryPath()
+	}
 
-	cmd := exec.CommandContext(ctx, "tart", "clone", registryPath, instanceName)
+	cmd := exec.CommandContext(ctx, "tart", "clone", imageRef, instanceName)
 	cmd.Env = append(os.Environ(), "TART_NO_AUTO_PRUNE=")
 
 	output, err := cmd.CombinedOutput()

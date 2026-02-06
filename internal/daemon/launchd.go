@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"text/template"
 
 	"github.com/rxtech-lab/rvmm/assets"
@@ -71,8 +72,9 @@ func Install(log *zap.Logger, cfg *config.Config, configPath string, out io.Writ
 
 	log.Info("Plist written", zap.String("path", plistPath))
 
-	// Load the daemon
-	cmd := exec.Command("launchctl", "load", plistPath)
+	// Load the daemon with modern launchctl API
+	domain := launchctlDomain(plistPath)
+	cmd := exec.Command("launchctl", "bootstrap", domain, plistPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to load daemon: %w\nOutput: %s", err, string(output))
@@ -85,7 +87,24 @@ func Install(log *zap.Logger, cfg *config.Config, configPath string, out io.Writ
 
 	fmt.Fprintf(out, "LaunchDaemon installed: %s\n", cfg.Daemon.Label)
 	fmt.Fprintf(out, "Plist location: %s\n", plistPath)
-	fmt.Fprintln(out, "\nThe runner will start automatically on boot.")
+	if domain == "system" {
+		fmt.Fprintln(out, "\nThe runner will start automatically on boot.")
+	} else {
+		fmt.Fprintln(out, "\nThe runner will start automatically on user login.")
+	}
+
+	// Verify the daemon is actually running after installation
+	running, err := IsRunning(cfg)
+	if err != nil {
+		log.Warn("Failed to check daemon status after install", zap.Error(err))
+	} else if !running {
+		log.Warn("Daemon was installed but does not appear to be running")
+		fmt.Fprintln(out, "\n⚠️  Warning: Daemon was installed but is not currently running.")
+		fmt.Fprintln(out, "Try running: launchctl bootstrap "+domain+" "+plistPath)
+	} else {
+		log.Info("Daemon verified running after install")
+		fmt.Fprintln(out, "\n✅ Daemon is running.")
+	}
 
 	return nil
 }
@@ -103,8 +122,9 @@ func Uninstall(log *zap.Logger, cfg *config.Config, out io.Writer) error {
 		return nil
 	}
 
-	// Unload the daemon
-	cmd := exec.Command("launchctl", "unload", plistPath)
+	// Unload the daemon with modern launchctl API
+	domain := launchctlDomain(plistPath)
+	cmd := exec.Command("launchctl", "bootout", domain, plistPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Warn("Failed to unload daemon (may already be unloaded)",
@@ -138,7 +158,8 @@ func Status(log *zap.Logger, cfg *config.Config, out io.Writer) error {
 	fmt.Fprintf(out, "Plist path: %s\n", plistPath)
 
 	// Check if loaded
-	cmd := exec.Command("launchctl", "list", cfg.Daemon.Label)
+	domain := launchctlDomain(plistPath)
+	cmd := exec.Command("launchctl", "print", fmt.Sprintf("%s/%s", domain, cfg.Daemon.Label))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		fmt.Fprintln(out, "Status: Not loaded")
@@ -159,4 +180,24 @@ func Status(log *zap.Logger, cfg *config.Config, out io.Writer) error {
 	}
 
 	return nil
+}
+
+// IsRunning checks whether the daemon is currently loaded and running
+func IsRunning(cfg *config.Config) (bool, error) {
+	plistPath := cfg.Daemon.PlistPath
+	domain := launchctlDomain(plistPath)
+	target := fmt.Sprintf("%s/%s", domain, cfg.Daemon.Label)
+	cmd := exec.Command("launchctl", "print", target)
+	if err := cmd.Run(); err != nil {
+		return false, nil
+	}
+	return true, nil
+}
+
+func launchctlDomain(plistPath string) string {
+	if strings.HasPrefix(plistPath, "/Library/LaunchDaemons/") {
+		return "system"
+	}
+	uid := os.Getuid()
+	return fmt.Sprintf("gui/%d", uid)
 }
