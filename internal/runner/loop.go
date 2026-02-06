@@ -146,7 +146,7 @@ func runOnce(ctx context.Context, log *zap.Logger, cfg *config.Config, vm *VMMan
 	}
 
 	// Configure runner
-	if err := ssh.ConfigureRunner(ctx, ip, token); err != nil {
+	if err := ssh.ConfigureRunner(ctx, ip, token, instanceName); err != nil {
 		return fmt.Errorf("failed to configure runner: %w", err)
 	}
 

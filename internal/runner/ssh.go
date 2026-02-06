@@ -109,8 +109,8 @@ func (s *SSHClient) ExecuteWithOutput(ctx context.Context, ip string, command st
 }
 
 // ConfigureRunner sets up the GitHub Actions runner on the VM
-func (s *SSHClient) ConfigureRunner(ctx context.Context, ip string, token string) error {
-	s.log.Info("Configuring GitHub Actions runner")
+func (s *SSHClient) ConfigureRunner(ctx context.Context, ip string, token string, runnerName string) error {
+	s.log.Info("Configuring GitHub Actions runner", zap.String("runner_name", runnerName))
 
 	labels := s.cfg.GitHub.RunnerLabels
 	if len(labels) == 0 {
@@ -130,7 +130,7 @@ func (s *SSHClient) ConfigureRunner(ctx context.Context, ip string, token string
 		"./actions-runner/config.sh --url %s --token %s --ephemeral --name %s --labels %s --unattended --replace",
 		s.cfg.GitHub.RunnerURL,
 		token,
-		s.cfg.GitHub.RunnerName,
+		runnerName,
 		labelsStr,
 	)
 
@@ -144,5 +144,22 @@ func (s *SSHClient) RunRunner(ctx context.Context, ip string) error {
 	// Source profile and run
 	runCmd := "source ~/.zprofile && ./actions-runner/run.sh"
 
-	return s.Execute(ctx, ip, runCmd, true)
+	// Use -t flag to force TTY allocation for real-time output
+	cmd := exec.CommandContext(ctx, "sshpass", "-e", "ssh",
+		"-t", // Force TTY allocation to prevent output buffering
+		"-q",
+		"-o", "StrictHostKeyChecking=no",
+		fmt.Sprintf("%s@%s", s.cfg.VM.Username, ip),
+		runCmd,
+	)
+	cmd.Env = append(os.Environ(), "SSHPASS="+s.cfg.VM.Password)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	s.log.Info("Executing runner command")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("runner execution failed: %w", err)
+	}
+
+	return nil
 }
