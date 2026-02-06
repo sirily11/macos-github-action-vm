@@ -16,6 +16,7 @@ import (
 type Event struct {
 	APIKey     string                 `json:"api_key"`
 	Event      string                 `json:"event"`
+	DistinctID string                 `json:"distinct_id"`
 	Properties map[string]interface{} `json:"properties"`
 	Timestamp  string                 `json:"timestamp"`
 }
@@ -24,6 +25,7 @@ type Event struct {
 type CaptureRequest struct {
 	APIKey     string                 `json:"api_key"`
 	Event      string                 `json:"event"`
+	DistinctID string                 `json:"distinct_id"`
 	Properties map[string]interface{} `json:"properties"`
 	Timestamp  string                 `json:"timestamp"`
 }
@@ -53,8 +55,9 @@ func NewClient(cfg *config.PostHogConfig, log *zap.Logger) *Client {
 // CaptureLogEvent sends a log line to PostHog
 func (c *Client) CaptureLogEvent(logType string, logLine string) error {
 	event := CaptureRequest{
-		APIKey: c.cfg.APIKey,
-		Event:  "mac_ci_log_line",
+		APIKey:     c.cfg.APIKey,
+		Event:      "mac_ci_log_line",
+		DistinctID: c.cfg.MachineLabel,
 		Properties: map[string]interface{}{
 			"mac_ci_machine_label": c.cfg.MachineLabel,
 			"mac_ci_log_type":      logType,
@@ -86,7 +89,7 @@ func (c *Client) CaptureLogEvent(logType string, logLine string) error {
 		return fmt.Errorf("PostHog API error (status %d): %s", resp.StatusCode, string(body))
 	}
 
-	c.log.Debug("Log event sent to PostHog",
+	c.log.Info("Log event sent to PostHog",
 		zap.String("log_type", logType),
 		zap.String("machine_label", c.cfg.MachineLabel),
 	)
@@ -108,8 +111,9 @@ func (c *Client) CaptureLogEventBatch(logType string, logLines []string) error {
 
 	for _, line := range logLines {
 		events = append(events, CaptureRequest{
-			APIKey: c.cfg.APIKey,
-			Event:  "mac_ci_log_line",
+			APIKey:     c.cfg.APIKey,
+			Event:      "mac_ci_log_line",
+			DistinctID: c.cfg.MachineLabel,
 			Properties: map[string]interface{}{
 				"mac_ci_machine_label": c.cfg.MachineLabel,
 				"mac_ci_log_type":      logType,
@@ -147,7 +151,7 @@ func (c *Client) CaptureLogEventBatch(logType string, logLines []string) error {
 		return fmt.Errorf("PostHog API error (status %d): %s", resp.StatusCode, string(body))
 	}
 
-	c.log.Debug("Batch log events sent to PostHog",
+	c.log.Info("Batch log events sent to PostHog",
 		zap.String("log_type", logType),
 		zap.Int("count", len(logLines)),
 		zap.String("machine_label", c.cfg.MachineLabel),
