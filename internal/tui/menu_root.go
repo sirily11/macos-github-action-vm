@@ -8,6 +8,7 @@ func rootMenuEntries() []menuEntry {
 		runMenuItem{},
 		imagesMenuItem{},
 		daemonMenuItem{},
+		monitorDaemonMenuItem{},
 		viewLogsMenuItem{},
 		quitMenuItem{},
 	}

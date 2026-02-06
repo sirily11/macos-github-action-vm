@@ -43,6 +43,9 @@ const (
 	actionDaemonInstall
 	actionDaemonUninstall
 	actionDaemonStatus
+	actionMonitorDaemonInstall
+	actionMonitorDaemonUninstall
+	actionMonitorDaemonStatus
 	actionViewLogs
 	actionQuit
 )
@@ -475,6 +478,24 @@ func (m model) runDaemonCmd(action actionType) tea.Cmd {
 			}
 		case actionDaemonStatus:
 			if err := daemon.Status(m.logger, cfg, m.logWriter); err != nil {
+				return taskDoneMsg{action: action, err: err}
+			}
+		case actionMonitorDaemonInstall:
+			if !cfg.PostHog.Enabled {
+				return taskDoneMsg{action: action, err: errors.New("PostHog must be enabled in config")}
+			}
+			if err := cfg.Validate(); err != nil {
+				return taskDoneMsg{action: action, err: err}
+			}
+			if err := daemon.InstallMonitor(m.logger, cfg, m.configPath, m.logWriter); err != nil {
+				return taskDoneMsg{action: action, err: err}
+			}
+		case actionMonitorDaemonUninstall:
+			if err := daemon.UninstallMonitor(m.logger, cfg, m.logWriter); err != nil {
+				return taskDoneMsg{action: action, err: err}
+			}
+		case actionMonitorDaemonStatus:
+			if err := daemon.StatusMonitor(m.logger, cfg, m.logWriter); err != nil {
 				return taskDoneMsg{action: action, err: err}
 			}
 		default:

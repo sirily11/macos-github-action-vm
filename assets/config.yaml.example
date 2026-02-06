@@ -62,3 +62,13 @@ daemon:
   plist_path: "/Library/LaunchDaemons/com.mirego.ekiden.plist"
   # User to run the daemon as
   user: "admin"
+
+posthog:
+  # Enable PostHog log monitoring
+  enabled: false
+  # PostHog API key (project API key)
+  api_key: "phc_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  # PostHog host URL (default: https://app.posthog.com)
+  host: "https://app.posthog.com"
+  # Machine label to differentiate logs from multiple machines
+  machine_label: "machine-1"

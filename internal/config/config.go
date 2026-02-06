@@ -13,6 +13,7 @@ type Config struct {
 	Registry RegistryConfig `mapstructure:"registry" yaml:"registry"`
 	Options  OptionsConfig  `mapstructure:"options" yaml:"options"`
 	Daemon   DaemonConfig   `mapstructure:"daemon" yaml:"daemon"`
+	PostHog  PostHogConfig  `mapstructure:"posthog" yaml:"posthog"`
 }
 
 // GitHubConfig contains GitHub API and runner settings
@@ -53,6 +54,14 @@ type DaemonConfig struct {
 	Label     string `mapstructure:"label" yaml:"label"`
 	PlistPath string `mapstructure:"plist_path" yaml:"plist_path"`
 	User      string `mapstructure:"user" yaml:"user"`
+}
+
+// PostHogConfig contains PostHog analytics settings
+type PostHogConfig struct {
+	Enabled      bool   `mapstructure:"enabled" yaml:"enabled"`
+	APIKey       string `mapstructure:"api_key" yaml:"api_key"`
+	Host         string `mapstructure:"host" yaml:"host"`
+	MachineLabel string `mapstructure:"machine_label" yaml:"machine_label"`
 }
 
 // Load reads configuration from file with defaults
@@ -108,4 +117,8 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("daemon.label", "com.mirego.ekiden")
 	v.SetDefault("daemon.plist_path", "/Library/LaunchDaemons/com.mirego.ekiden.plist")
 	v.SetDefault("daemon.user", "admin")
+
+	// PostHog defaults
+	v.SetDefault("posthog.enabled", false)
+	v.SetDefault("posthog.host", "https://app.posthog.com")
 }

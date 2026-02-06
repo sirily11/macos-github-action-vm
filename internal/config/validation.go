@@ -41,6 +41,19 @@ func (c *Config) Validate() error {
 		errs = append(errs, "options.max_concurrent_runners must be at least 1")
 	}
 
+	// PostHog validation
+	if c.PostHog.Enabled {
+		if c.PostHog.APIKey == "" {
+			errs = append(errs, "posthog.api_key is required when posthog is enabled")
+		}
+		if c.PostHog.MachineLabel == "" {
+			errs = append(errs, "posthog.machine_label is required when posthog is enabled")
+		}
+		if c.PostHog.Host == "" {
+			errs = append(errs, "posthog.host is required when posthog is enabled")
+		}
+	}
+
 	if len(errs) > 0 {
 		return errors.New(strings.Join(errs, "; "))
 	}
