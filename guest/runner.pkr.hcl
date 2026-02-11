@@ -52,4 +52,27 @@ build {
       "rm -rf \"$tmp_dir\"",
     ]
   }
+
+  // Xcode Simulators
+  provisioner "shell" {
+    inline = [
+      "source ~/.zprofile",
+      "set -euo pipefail",
+      "echo 'Setting Xcode path...'",
+      "sudo xcode-select -s \"/Applications/$(ls /Applications | grep -m 1 Xcode)\"",
+      "echo 'Accepting Xcode license...'",
+      "sudo xcodebuild -license accept",
+      "echo 'Running Xcode first launch setup...'",
+      "sudo xcodebuild -runFirstLaunch",
+      "echo 'Waiting for simulator service to be ready...'",
+      "sleep 10",
+      "echo 'Downloading all Xcode platforms and simulators with retry logic...'",
+      "for i in 1 2 3; do echo \"Attempt $i of 3...\"; if sudo xcodebuild -downloadAllPlatforms; then echo 'Download successful'; break; else echo \"Attempt $i failed\"; if [ $i -eq 3 ]; then echo 'All attempts failed'; exit 1; fi; sleep 15; fi; done",
+      "echo 'Xcode simulator installation complete'",
+      "echo 'Verifying installed simulators...'",
+      "xcrun simctl list runtimes",
+      "echo 'Available devices:'",
+      "xcrun simctl list devices available | head -20",
+    ]
+  }
 }
