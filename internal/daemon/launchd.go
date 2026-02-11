@@ -66,6 +66,9 @@ func Install(log *zap.Logger, cfg *config.Config, configPath string, out io.Writ
 
 	// Write plist file
 	plistPath := cfg.Daemon.PlistPath
+	if err := os.MkdirAll(filepath.Dir(plistPath), 0755); err != nil {
+		return fmt.Errorf("failed to create plist directory: %w", err)
+	}
 	if err := os.WriteFile(plistPath, buf.Bytes(), 0644); err != nil {
 		return fmt.Errorf("failed to write plist (try with sudo): %w", err)
 	}

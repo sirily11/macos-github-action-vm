@@ -42,6 +42,11 @@ func RunWithIO(log *zap.Logger, stdout, stderr io.Writer, stdin io.Reader) error
 		}
 	}
 
+	// Initialize Packer plugins (installs the tart plugin)
+	if err := initPacker(log, stdout, stderr); err != nil {
+		return fmt.Errorf("packer init failed: %w", err)
+	}
+
 	// Validate system
 	if err := validateSystem(log); err != nil {
 		log.Warn("System validation warnings", zap.Error(err))
@@ -186,6 +191,29 @@ func ensureTap(log *zap.Logger, tap string, stdout, stderr io.Writer) error {
 		return fmt.Errorf("brew tap %s failed: %w", tap, err)
 	}
 
+	return nil
+}
+
+func initPacker(log *zap.Logger, stdout, stderr io.Writer) error {
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working directory: %w", err)
+	}
+
+	pkrFile := filepath.Join(workingDir, "guest", "runner.pkr.hcl")
+	if _, err := os.Stat(pkrFile); os.IsNotExist(err) {
+		log.Info("Packer file not found, skipping packer init", zap.String("path", pkrFile))
+		return nil
+	}
+
+	log.Info("Initializing Packer plugins")
+	cmd := exec.Command("packer", "init", pkrFile)
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("packer init %s failed: %w", pkrFile, err)
+	}
+	log.Info("Packer plugins initialized")
 	return nil
 }
 

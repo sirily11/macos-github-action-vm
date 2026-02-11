@@ -159,11 +159,13 @@ func (s *SSHClient) RunRunner(ctx context.Context, ip string) error {
 	// Source profile and run
 	runCmd := "source ~/.zprofile && ./actions-runner/run.sh"
 
-	// Use -t flag to force TTY allocation for real-time output
+	// Use -T flag to disable TTY allocation (non-interactive)
 	cmd := exec.CommandContext(ctx, "sshpass", "-e", "ssh",
-		"-t", // Force TTY allocation to prevent output buffering
+		"-T", // Disable TTY allocation for non-interactive runner execution
 		"-q",
 		"-o", "StrictHostKeyChecking=no",
+		"-o", "ServerAliveInterval=30",
+		"-o", "ServerAliveCountMax=3",
 		fmt.Sprintf("%s@%s", s.cfg.VM.Username, ip),
 		runCmd,
 	)
